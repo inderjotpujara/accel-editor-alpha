@@ -1,6 +1,7 @@
 import { map, type MapStore } from 'nanostores';
 import type { BoltAction } from '~/types/actions';
 import { createScopedLogger } from '~/utils/logger';
+import { detectProjectType } from '~/utils/projectDetection';
 import { unreachable } from '~/utils/unreachable';
 import type { ActionCallbackData } from './message-parser';
 import type { FilesStore } from '~/lib/stores/files';
@@ -183,15 +184,40 @@ export class ActionRunner {
     try {
       logger.info(`Creating/updating file: ${filePath} (${content?.length || 0} characters)`);
 
+      // detect project type to apply appropriate path normalization
+      const projectInfo = detectProjectType(this.#filesStore.files.get());
+      logger.debug(`Detected project type: ${projectInfo.type}`);
+
       // normalize the file path - ensure it follows the expected directory structure
       let normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
 
-      // ensure the path starts with the work directory structure
+      // apply project-specific path normalization
       if (!normalizedPath.startsWith('home/project/')) {
-        normalizedPath = `home/project/${normalizedPath}`;
+        // for Java projects, handle common source paths
+        if (projectInfo.type === 'maven' || projectInfo.type === 'gradle' || projectInfo.type === 'gradle-kotlin') {
+          if (normalizedPath.endsWith('.java') && !normalizedPath.includes('src/')) {
+            // place Java files in appropriate source directory
+            if (normalizedPath.includes('Test') || normalizedPath.includes('test')) {
+              normalizedPath = `home/project/src/test/java/${normalizedPath}`;
+            } else {
+              normalizedPath = `home/project/src/main/java/${normalizedPath}`;
+            }
+          } else if (
+            normalizedPath.endsWith('.properties') ||
+            normalizedPath.endsWith('.yml') ||
+            normalizedPath.endsWith('.yaml')
+          ) {
+            // place config files in resources
+            normalizedPath = `home/project/src/main/resources/${normalizedPath}`;
+          } else {
+            normalizedPath = `home/project/${normalizedPath}`;
+          }
+        } else {
+          normalizedPath = `home/project/${normalizedPath}`;
+        }
       }
 
-      logger.debug(`Normalized file path: ${normalizedPath}`);
+      logger.debug(`Normalized file path: ${normalizedPath} (project: ${projectInfo.type})`);
 
       // create any necessary parent directories
       const pathParts = normalizedPath.split('/');
@@ -209,11 +235,19 @@ export class ActionRunner {
       // clean up the content - remove any markdown formatting but preserve actual code structure
       let cleanContent = content || '';
 
-      // remove markdown code block markers if present - handle various patterns
-      cleanContent = cleanContent.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '');
-      cleanContent = cleanContent.replace(/^```\n?/, '').replace(/\n?```$/, '');
+      /**
+       * Remove markdown code block markers if present - handle various patterns.
+       * First, handle opening markers with optional language specifier.
+       */
+      cleanContent = cleanContent.replace(/^```[a-zA-Z0-9]*\s*\n?/, '');
+      
+      // then handle closing markers (including multiple backticks)
+      cleanContent = cleanContent.replace(/\n?\s*```+\s*$/, '');
+      
+      // handle cases where backticks might not be at the very start/end
+      cleanContent = cleanContent.replace(/^```+\s*/, '').replace(/\s*```+$/, '');
 
-      // remove any remaining stray backticks at the start or end
+      // remove any remaining stray backticks at the start or end (including multiple)
       cleanContent = cleanContent.replace(/^`+/, '').replace(/`+$/, '');
 
       // trim leading/trailing whitespace but preserve internal structure

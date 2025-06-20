@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { FileMap } from '~/lib/stores/files';
 import { classNames } from '~/utils/classNames';
+import { getFileIcon, getFileTypeColor } from '~/utils/fileIcons';
 import { createScopedLogger, renderLogger } from '~/utils/logger';
 
 const logger = createScopedLogger('FileTree');
@@ -194,7 +195,7 @@ function File({ file: { depth, name }, onClick, selected, unsavedChanges = false
         'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent': selected,
       })}
       depth={depth}
-      iconClasses={classNames('i-ph:file-duotone scale-98', {
+      iconClasses={classNames(getFileIcon(name), getFileTypeColor(name), 'scale-98', {
         'group-hover:text-bolt-elements-item-contentActive': !selected,
       })}
       onClick={onClick}

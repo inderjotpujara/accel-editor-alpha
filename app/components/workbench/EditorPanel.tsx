@@ -18,8 +18,10 @@ import { themeStore } from '~/lib/stores/theme';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { WORK_DIR } from '~/utils/constants';
+import { getFileIcon, getFileTypeColor } from '~/utils/fileIcons';
 import { renderLogger } from '~/utils/logger';
 import { isMobile } from '~/utils/mobile';
+import { detectProjectType } from '~/utils/projectDetection';
 import { FileBreadcrumb } from './FileBreadcrumb';
 import { FileTree } from './FileTree';
 import { Terminal, type TerminalRef } from './terminal/Terminal';
@@ -80,6 +82,14 @@ export const EditorPanel = memo(
       return editorDocument !== undefined && unsavedFiles?.has(editorDocument.filePath);
     }, [editorDocument, unsavedFiles]);
 
+    const projectInfo = useMemo(() => {
+      if (!files || Object.keys(files).length === 0) {
+        return null;
+      }
+
+      return detectProjectType(files);
+    }, [files]);
+
     useEffect(() => {
       const unsubscribeFromEventEmitter = shortcutEventEmitter.on('toggleTerminal', () => {
         terminalToggledByShortcut.current = true;
@@ -130,7 +140,24 @@ export const EditorPanel = memo(
               <div className="flex flex-col border-r border-bolt-elements-borderColor h-full">
                 <PanelHeader>
                   <div className="i-ph:tree-structure-duotone shrink-0" />
-                  Files
+                  <span>Files</span>
+                  {projectInfo && projectInfo.type !== 'unknown' && (
+                    <div className="ml-auto flex items-center text-xs text-bolt-elements-textSecondary">
+                      <div
+                        className={classNames(
+                          'shrink-0 mr-1',
+                          projectInfo.type === 'maven'
+                            ? 'i-ph:package-duotone text-orange-600'
+                            : projectInfo.type.startsWith('gradle')
+                              ? 'i-ph:gear-duotone text-green-600'
+                              : projectInfo.type === 'node'
+                                ? 'i-ph:package-duotone text-green-500'
+                                : 'i-ph:folder-duotone',
+                        )}
+                      />
+                      <span className="capitalize">{projectInfo.type.replace('-', ' ')}</span>
+                    </div>
+                  )}
                 </PanelHeader>
                 <FileTree
                   className="h-full"
@@ -145,36 +172,70 @@ export const EditorPanel = memo(
             </Panel>
             <PanelResizeHandle />
             <Panel className="flex flex-col" defaultSize={80} minSize={20}>
-              <PanelHeader className="overflow-x-auto">
-                {activeFileSegments?.length && (
-                  <div className="flex items-center flex-1 text-sm">
-                    <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
+              {/* File Tab Bar - Similar to VS Code */}
+              {editorDocument && (
+                <div className="flex items-stretch bg-bolt-elements-background-depth-1 border-b border-bolt-elements-borderColor">
+                  <div className="flex items-center px-4 py-2 bg-bolt-elements-background-depth-2 border-r border-bolt-elements-borderColor min-w-0 flex-1 relative">
+                    {/* Tab indicator line */}
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-blue-500"></div>
+                    <div
+                      className={classNames(
+                        'shrink-0 mr-2',
+                        getFileIcon(activeFileSegments?.[activeFileSegments.length - 1] || ''),
+                        getFileTypeColor(activeFileSegments?.[activeFileSegments.length - 1] || ''),
+                      )}
+                    />
+                    <span className="text-sm font-medium text-bolt-elements-textPrimary truncate flex-1">
+                      {activeFileSegments?.[activeFileSegments.length - 1]}
+                    </span>
                     {activeFileUnsaved && (
-                      <div className="flex gap-1 ml-auto -mr-1.5">
-                        <PanelHeaderButton onClick={onFileSave}>
-                          <div className="i-ph:floppy-disk-duotone" />
-                          Save
-                        </PanelHeaderButton>
-                        <PanelHeaderButton onClick={onFileReset}>
-                          <div className="i-ph:clock-counter-clockwise-duotone" />
-                          Reset
-                        </PanelHeaderButton>
-                      </div>
+                      <div className="ml-2 w-2 h-2 rounded-full bg-orange-500 shrink-0" title="Unsaved changes" />
                     )}
                   </div>
-                )}
-              </PanelHeader>
+                  {activeFileUnsaved && (
+                    <div className="flex items-center gap-1 px-3 bg-bolt-elements-background-depth-1">
+                      <PanelHeaderButton onClick={onFileSave} className="text-xs px-2 py-1">
+                        <div className="i-ph:floppy-disk-duotone mr-1" />
+                        Save
+                      </PanelHeaderButton>
+                      <PanelHeaderButton onClick={onFileReset} className="text-xs px-2 py-1">
+                        <div className="i-ph:clock-counter-clockwise-duotone mr-1" />
+                        Reset
+                      </PanelHeaderButton>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Breadcrumb Header - Secondary */}
+              {editorDocument && (
+                <PanelHeader className="overflow-x-auto bg-bolt-elements-background-depth-1">
+                  <div className="flex items-center flex-1 text-xs text-bolt-elements-textSecondary">
+                    <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
+                  </div>
+                </PanelHeader>
+              )}
               <div className="h-full flex-1 overflow-hidden">
-                <CodeMirrorEditor
-                  theme={theme}
-                  editable={!isStreaming && editorDocument !== undefined}
-                  settings={editorSettings}
-                  doc={editorDocument}
-                  autoFocusOnDocumentChange={!isMobile()}
-                  onScroll={onEditorScroll}
-                  onChange={onEditorChange}
-                  onSave={onFileSave}
-                />
+                {editorDocument ? (
+                  <CodeMirrorEditor
+                    theme={theme}
+                    editable={!isStreaming && editorDocument !== undefined}
+                    settings={editorSettings}
+                    doc={editorDocument}
+                    autoFocusOnDocumentChange={!isMobile()}
+                    onScroll={onEditorScroll}
+                    onChange={onEditorChange}
+                    onSave={onFileSave}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-bolt-elements-textSecondary">
+                    <div className="text-center">
+                      <div className="i-ph:file-duotone text-4xl mb-4 opacity-50"></div>
+                      <p className="text-lg">No file selected</p>
+                      <p className="text-sm mt-2">Select a file from the file tree to start editing</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </Panel>
           </PanelGroup>
