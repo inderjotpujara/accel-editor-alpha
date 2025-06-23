@@ -206,7 +206,6 @@ export const EditorPanel = memo(
                   )}
                 </div>
               )}
-              
               {/* Breadcrumb Header - Secondary */}
               {editorDocument && (
                 <PanelHeader className="overflow-x-auto bg-bolt-elements-background-depth-1">

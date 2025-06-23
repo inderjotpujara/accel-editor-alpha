@@ -99,6 +99,27 @@ export const supportedLanguages = [
       return import('@codemirror/lang-java').then((module) => module.java());
     },
   }),
+  LanguageDescription.of({
+    name: 'XML',
+    extensions: ['xml'],
+    async load() {
+      return import('@codemirror/lang-xml').then((module) => module.xml());
+    },
+  }),
+  LanguageDescription.of({
+    name: 'YAML',
+    extensions: ['yml', 'yaml'],
+    async load() {
+      return import('@codemirror/lang-yaml').then((module) => module.yaml());
+    },
+  }),
+  LanguageDescription.of({
+    name: 'Gradle',
+    extensions: ['gradle'],
+    async load() {
+      return import('@codemirror/lang-java').then((module) => module.java());
+    },
+  }),
 ];
 
 export async function getLanguage(fileName: string) {

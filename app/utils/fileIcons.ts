@@ -132,6 +132,12 @@ export function getFileIcon(fileName: string): string {
     case 'cmd': {
       return 'i-ph:terminal-duotone';
     }
+    case 'gradle': {
+      return 'i-ph:gear-duotone';
+    }
+    case 'toml': {
+      return 'i-ph:gear-duotone';
+    }
     default: {
       return 'i-ph:file-duotone';
     }
@@ -238,6 +244,12 @@ export function getFileTypeColor(fileName: string): string {
     case 'bat':
     case 'cmd': {
       return 'text-green-400';
+    }
+    case 'gradle': {
+      return 'text-green-600';
+    }
+    case 'toml': {
+      return 'text-gray-500';
     }
     default: {
       return 'text-bolt-elements-textSecondary';
